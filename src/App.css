@@ -525,7 +525,11 @@ textarea {
   border-radius: 12px;
 }
 
-.swagger-loading {
+.swagger-initial-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 120px;
   padding: 32px;
   color: var(--muted);
   font-family: var(--mono);

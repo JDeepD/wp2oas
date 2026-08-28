@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { dump as toYaml } from 'js-yaml'
 import { SwaggerViewer } from './components/SwaggerViewer.tsx'
 import {
@@ -24,6 +24,17 @@ const INPUT_MODES: Array<{ id: InputMode; label: string }> = [
   { id: 'file', label: 'Upload JSON' },
   { id: 'paste', label: 'Paste JSON' },
 ]
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedValue(value), delayMs)
+    return () => window.clearTimeout(timeout)
+  }, [delayMs, value])
+
+  return debouncedValue
+}
 
 function ArrowIcon() {
   return (
@@ -94,9 +105,10 @@ function App() {
   const [fileInputKey, setFileInputKey] = useState(0)
   const requestController = useRef<AbortController | null>(null)
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
+  const debouncedEndpointSearch = useDebouncedValue(endpointSearch, 200)
   const endpointSearchResult = useMemo(
-    () => result ? filterOpenApiDocument(result.spec, endpointSearch) : null,
-    [endpointSearch, result],
+    () => result ? filterOpenApiDocument(result.spec, debouncedEndpointSearch) : null,
+    [debouncedEndpointSearch, result],
   )
 
   const selectMode = (nextMode: InputMode) => {
@@ -373,16 +385,22 @@ function App() {
                 </span>
               </div>
             </div>
-            {endpointSearchResult && endpointSearchResult.operations > 0 ? (
-              <div className="swagger-frame">
-                <SwaggerViewer spec={endpointSearchResult.spec} />
-              </div>
-            ) : (
-              <div className="empty-search" role="status">
-                <strong>No endpoints found</strong>
-                <span>Try a path segment, HTTP method, operation ID, or namespace.</span>
-                <button type="button" onClick={() => setEndpointSearch('')}>Clear search</button>
-              </div>
+            {endpointSearchResult && (
+              <>
+                <div
+                  className="swagger-frame"
+                  hidden={endpointSearchResult.operations === 0}
+                >
+                  <SwaggerViewer spec={endpointSearchResult.spec} />
+                </div>
+                {endpointSearchResult.operations === 0 && (
+                  <div className="empty-search" role="status">
+                    <strong>No endpoints found</strong>
+                    <span>Try a path segment, HTTP method, operation ID, or namespace.</span>
+                    <button type="button" onClick={() => setEndpointSearch('')}>Clear search</button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

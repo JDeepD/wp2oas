@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import 'swagger-ui-dist/swagger-ui.css'
+import type { SwaggerUISystem } from 'swagger-ui-dist/swagger-ui-es-bundle.js'
 import type { OpenAPIDocument } from '../lib/openapi.ts'
 
 interface SwaggerViewerProps {
@@ -8,38 +9,60 @@ interface SwaggerViewerProps {
 
 export function SwaggerViewer({ spec }: SwaggerViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const latestSpecRef = useRef(spec)
+  const systemRef = useRef<SwaggerUISystem | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     let active = true
 
-    container.textContent = 'Preparing interactive documentation…'
-    container.classList.add('swagger-loading')
     void import('swagger-ui-dist/swagger-ui-es-bundle.js')
       .then(({ default: SwaggerUI }) => {
         if (!active) return
-        container.classList.remove('swagger-loading')
-        SwaggerUI({
+        systemRef.current = SwaggerUI({
           domNode: container,
-          spec,
+          spec: latestSpecRef.current,
           deepLinking: true,
           displayRequestDuration: true,
           docExpansion: 'list',
           defaultModelsExpandDepth: -1,
           tryItOutEnabled: false,
         })
+        setStatus('ready')
       })
       .catch(() => {
         if (!active) return
-        container.textContent = 'Interactive documentation could not be loaded. Your JSON and YAML downloads are still available.'
+        setStatus('error')
       })
 
     return () => {
       active = false
+      systemRef.current = null
       container.replaceChildren()
     }
+  }, [])
+
+  useEffect(() => {
+    latestSpecRef.current = spec
+    systemRef.current?.specActions.updateJsonSpec(spec)
   }, [spec])
 
-  return <div ref={containerRef} className="swagger-viewer" aria-live="polite" />
+  return (
+    <div className="swagger-viewer">
+      {status === 'loading' && (
+        <div className="swagger-initial-state" role="status">
+          <span className="spinner" aria-hidden="true" />
+          <span>Loading API reference...</span>
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="swagger-initial-state" role="alert">
+          Interactive documentation could not be loaded. JSON and YAML downloads are still available.
+        </div>
+      )}
+      <div ref={containerRef} hidden={status !== 'ready'} />
+    </div>
+  )
 }

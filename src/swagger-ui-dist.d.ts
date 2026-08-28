@@ -1,4 +1,10 @@
 declare module 'swagger-ui-dist/swagger-ui-es-bundle.js' {
+  export interface SwaggerUISystem {
+    specActions: {
+      updateJsonSpec(spec: unknown): void
+    }
+  }
+
   interface SwaggerUIOptions {
     domNode: Element
     spec: unknown
@@ -9,5 +15,5 @@ declare module 'swagger-ui-dist/swagger-ui-es-bundle.js' {
     tryItOutEnabled?: boolean
   }
 
-  export default function SwaggerUI(options: SwaggerUIOptions): unknown
+  export default function SwaggerUI(options: SwaggerUIOptions): SwaggerUISystem
 }
