@@ -114,6 +114,7 @@ test('maps supported schema constraints and warns instead of emitting invalid va
           },
           broken: { type: 'mystery', minimum: 'low', pattern: '(' },
           ids: { type: 'array', items: { type: 'integer' } },
+          mismatched: { type: 'integer', pattern: '[a-z]+', minLength: 2 },
         },
       },
     }),
@@ -125,7 +126,26 @@ test('maps supported schema constraints and warns instead of emitting invalid va
   assert.deepEqual(term?.enum, ['one'])
   assert.equal(term?.nullable, true)
   assert.equal(ids?.items?.type, 'integer')
+  const mismatched = parameters.find(({ name }) => name === 'mismatched')?.schema
+  assert.equal(mismatched?.pattern, undefined)
+  assert.equal(mismatched?.minLength, undefined)
   assert.ok(result.warnings.length >= 3)
+})
+
+test('anchors route regex constraints without changing argument pattern semantics', () => {
+  const result = convertWordPressIndex(
+    indexWith({
+      '/demo/v1/items/(?P<slug>[\\w-]+)': {
+        methods: ['GET'],
+        args: {
+          query: { type: 'string', pattern: '^prefix-' },
+        },
+      },
+    }),
+  )
+  const parameters = result.spec.paths['/demo/v1/items/{slug}'].get?.parameters ?? []
+  assert.equal(parameters.find(({ name }) => name === 'slug')?.schema.pattern, '^(?:[\\w-]+)$')
+  assert.equal(parameters.find(({ name }) => name === 'query')?.schema.pattern, '^prefix-')
 })
 
 test('skips invalid and unsupported routes while reporting accurate stats', () => {

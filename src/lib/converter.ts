@@ -94,14 +94,35 @@ function getMethods(value: unknown): string[] {
     .filter(Boolean)
 }
 
-function getArguments(value: unknown): Record<string, WordPressArgument> {
-  if (!isRecord(value)) return {}
+function getArguments(
+  value: unknown,
+  warnings: ConversionWarning[],
+  route: string,
+): Record<string, WordPressArgument> {
+  if (value === undefined || value === null || Array.isArray(value)) return {}
+  if (!isRecord(value)) {
+    warnings.push({
+      code: 'invalid-argument',
+      message: 'An invalid arguments collection was ignored.',
+      route,
+    })
+    return {}
+  }
 
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, WordPressArgument] => isRecord(entry[1]),
-    ),
-  )
+  const argumentsByName: Record<string, WordPressArgument> = {}
+  for (const [name, definition] of Object.entries(value)) {
+    if (isRecord(definition)) {
+      argumentsByName[name] = definition
+    } else {
+      warnings.push({
+        code: 'invalid-argument',
+        message: `The definition for argument “${name}” was ignored.`,
+        route,
+        argument: name,
+      })
+    }
+  }
+  return argumentsByName
 }
 
 function parseNamedGroup(
@@ -181,12 +202,16 @@ function convertRoutePath(rawRoute: string): ConvertedRoute | undefined {
   return { path, parameters }
 }
 
-function normalizePattern(pattern: string): string {
+function normalizeRoutePattern(pattern: string): string {
   return pattern.replaceAll('\\/', '/').replace(/^\^/, '').replace(/\$$/, '')
 }
 
+function routeSchemaPattern(pattern: string): string {
+  return `^(?:${normalizeRoutePattern(pattern)})$`
+}
+
 function isClearlyIntegerPattern(pattern: string): boolean {
-  const normalized = normalizePattern(pattern).replace(/^\(\?:/, '').replace(/\)$/, '')
+  const normalized = normalizeRoutePattern(pattern).replace(/^\(\?:/, '').replace(/\)$/, '')
   return /^(?:\\d\+|\[\\d\]\+|\[0-9\]\+|\\d\{\d+,?\d*\}|\[0-9\]\{\d+,?\d*\})$/.test(
     normalized,
   )
@@ -195,7 +220,7 @@ function isClearlyIntegerPattern(pattern: string): boolean {
 function isSafePattern(pattern: string): boolean {
   if (!pattern || UNSAFE_PCRE_TOKENS.test(pattern)) return false
   try {
-    new RegExp(`^(?:${normalizePattern(pattern)})$`)
+    new RegExp(`^(?:${normalizeRoutePattern(pattern)})$`)
     return true
   } catch {
     return false
@@ -246,6 +271,17 @@ function schemaWarning(
   warnings.push({ code: 'unsupported-schema', message, ...context })
 }
 
+function schemaAllowsType(
+  schema: OpenAPISchema,
+  allowedTypes: Array<NonNullable<OpenAPISchema['type']>>,
+): boolean {
+  if (schema.type) return allowedTypes.includes(schema.type)
+  if (schema.oneOf) {
+    return schema.oneOf.some(({ type }) => type && allowedTypes.includes(type))
+  }
+  return true
+}
+
 function buildSchema(
   definition: WordPressArgument,
   warnings: ConversionWarning[],
@@ -276,6 +312,13 @@ function buildSchema(
   }
   if (nullable || rawTypes.length === 1 && rawTypes[0] === 'null') {
     schema.nullable = true
+  }
+  if (rawTypes.length === 1 && rawTypes[0] === 'null') {
+    schemaWarning(
+      warnings,
+      'A null-only type cannot be represented exactly in OpenAPI 3.0 and was left unconstrained and nullable.',
+      context,
+    )
   }
 
   const description = asNonEmptyString(definition.description)
@@ -315,20 +358,32 @@ function buildSchema(
   for (const key of ['minimum', 'maximum'] as const) {
     const value = definition[key]
     if (value === undefined) continue
-    if (typeof value === 'number' && Number.isFinite(value)) schema[key] = value
+    if (
+      typeof value === 'number' &&
+      Number.isFinite(value) &&
+      schemaAllowsType(schema, ['integer', 'number'])
+    ) schema[key] = value
     else schemaWarning(warnings, `Invalid ${key} value was omitted.`, context)
   }
 
   for (const key of ['minLength', 'maxLength'] as const) {
     const value = definition[key]
     if (value === undefined) continue
-    if (Number.isInteger(value) && (value as number) >= 0) schema[key] = value as number
+    if (
+      Number.isInteger(value) &&
+      (value as number) >= 0 &&
+      schemaAllowsType(schema, ['string'])
+    ) schema[key] = value as number
     else schemaWarning(warnings, `Invalid ${key} value was omitted.`, context)
   }
 
   if (definition.pattern !== undefined) {
-    if (typeof definition.pattern === 'string' && isSafePattern(definition.pattern)) {
-      schema.pattern = normalizePattern(definition.pattern)
+    if (
+      typeof definition.pattern === 'string' &&
+      isSafePattern(definition.pattern) &&
+      schemaAllowsType(schema, ['string'])
+    ) {
+      schema.pattern = definition.pattern.replaceAll('\\/', '/')
     } else {
       warnings.push({
         code: 'unsafe-pattern',
@@ -338,7 +393,10 @@ function buildSchema(
     }
   }
 
-  if (schema.type === 'array' || definition.items !== undefined) {
+  if (definition.items !== undefined && !schema.type && !schema.oneOf) {
+    schema.type = 'array'
+  }
+  if (schemaAllowsType(schema, ['array']) && (schema.type === 'array' || definition.items !== undefined)) {
     if (isRecord(definition.items)) {
       schema.items = buildSchema(definition.items, warnings, context)
     } else {
@@ -347,9 +405,14 @@ function buildSchema(
         schemaWarning(warnings, 'Invalid array items were replaced with an unconstrained schema.', context)
       }
     }
+  } else if (definition.items !== undefined) {
+    schemaWarning(warnings, 'Array items on a non-array schema were omitted.', context)
   }
 
-  if (schema.type === 'object' && isRecord(definition.properties)) {
+  if (isRecord(definition.properties) && !schema.type && !schema.oneOf) {
+    schema.type = 'object'
+  }
+  if (schemaAllowsType(schema, ['object']) && isRecord(definition.properties)) {
     const properties: Record<string, OpenAPISchema> = {}
     for (const [name, property] of Object.entries(definition.properties)) {
       if (!isRecord(property)) continue
@@ -401,11 +464,11 @@ function pathParameterSchema(
 
   if (!schema.type) schema.type = 'string'
   if (schema.type === 'string' && isSafePattern(parameter.pattern)) {
-    schema.pattern = normalizePattern(parameter.pattern)
-  } else if (parameter.pattern && schema.type === 'string') {
+    schema.pattern = routeSchemaPattern(parameter.pattern)
+  } else if (parameter.pattern) {
     warnings.push({
       code: 'unsafe-pattern',
-      message: `The route pattern for “${parameter.name}” could not be represented safely.`,
+      message: `The route pattern for “${parameter.name}” could not be represented safely with its inferred type.`,
       ...context,
     })
   }
@@ -505,17 +568,25 @@ function collectOperationSeeds(
   warnings: ConversionWarning[],
 ): Map<OpenAPIHttpMethod, OperationSeed> {
   const seeds = new Map<OpenAPIHttpMethod, OperationSeed>()
-  const routeArguments = getArguments(route.args)
+  const routeArguments = getArguments(route.args, warnings, path)
   const routeMethods = getMethods(route.methods)
-  const endpoints = Array.isArray(route.endpoints)
-    ? route.endpoints.filter((endpoint): endpoint is WordPressEndpoint => isRecord(endpoint))
-    : []
+  const endpointValues = Array.isArray(route.endpoints) ? route.endpoints : []
+  const endpoints = endpointValues.filter(
+    (endpoint): endpoint is WordPressEndpoint => isRecord(endpoint),
+  )
+  if (endpoints.length !== endpointValues.length) {
+    warnings.push({
+      code: 'invalid-route',
+      message: 'One or more invalid endpoint definitions were ignored.',
+      route: path,
+    })
+  }
   const definitions = endpoints.length ? endpoints : [{ methods: route.methods, args: route.args }]
 
   for (const endpoint of definitions) {
     const methods = getMethods(endpoint.methods)
     const effectiveMethods = methods.length ? methods : routeMethods
-    const endpointArguments = getArguments(endpoint.args)
+    const endpointArguments = getArguments(endpoint.args, warnings, path)
     for (const rawMethod of effectiveMethods) {
       if (!SUPPORTED_METHODS.has(rawMethod as OpenAPIHttpMethod)) {
         warnings.push({
