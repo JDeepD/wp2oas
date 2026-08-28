@@ -1,32 +1,42 @@
-# React + TypeScript + Vite
+# WP OpenAPI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+WP OpenAPI is a client-side React application that converts a WordPress REST API index into an OpenAPI 3.0.3 document and renders it with Swagger UI.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Fetches a public WordPress REST index from a site URL, `/wp-json`, or `/?rest_route=/` URL.
+- Imports a downloaded JSON file of up to 10 MB.
+- Converts pasted REST index JSON.
+- Maps WordPress namespaces, routes, methods, arguments, constraints, and named regex path parameters to OpenAPI.
+- Reports conversion warnings and route, path, operation, and skipped-route counts.
+- Downloads the generated document as JSON or YAML.
 
-## React Compiler
+The input and generated document stay in browser memory. The application has no backend, proxy, persistence layer, authentication flow, or analytics dependency.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Run all project checks with:
+
+```sh
+npm run check
+```
+
+The individual commands are `npm run lint`, `npm test`, and `npm run build`.
+
+## Project structure
+
+- `src/lib/converter.ts` contains the pure `convertWordPressIndex` implementation.
+- `src/lib/input.ts` handles URL normalization, browser fetches, file reads, JSON parsing, and input errors.
+- `src/components/SwaggerViewer.tsx` mounts Swagger UI with the generated document through its `spec` option.
+- `tests/` covers route conversion, method merging, schema mapping, server derivation, validation, cancellation, and network error classification.
+
+## Browser fetch limitations
+
+WordPress URL mode makes a direct browser request to the target site. The site must allow the application origin through CORS, and an HTTPS deployment cannot fetch an HTTP-only WordPress site. When a direct request is blocked, download the WordPress `/wp-json` response and use file upload or paste mode.
+
+Credentials, cookies, authorization headers, application passwords, and private WordPress endpoints are intentionally unsupported.
