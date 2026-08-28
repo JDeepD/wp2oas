@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { dump as toYaml } from 'js-yaml'
 import { SwaggerViewer } from './components/SwaggerViewer.tsx'
 import {
@@ -13,6 +13,7 @@ import {
   WordPressInputError,
 } from './lib/input.ts'
 import type { OpenAPIDocument } from './lib/openapi.ts'
+import { filterOpenApiDocument } from './lib/search.ts'
 import type { WordPressRestIndex } from './lib/wordpress.ts'
 import './App.css'
 
@@ -89,9 +90,14 @@ function App() {
   const [result, setResult] = useState<ConversionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [endpointSearch, setEndpointSearch] = useState('')
   const [fileInputKey, setFileInputKey] = useState(0)
   const requestController = useRef<AbortController | null>(null)
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
+  const endpointSearchResult = useMemo(
+    () => result ? filterOpenApiDocument(result.spec, endpointSearch) : null,
+    [endpointSearch, result],
+  )
 
   const selectMode = (nextMode: InputMode) => {
     setMode(nextMode)
@@ -160,6 +166,7 @@ function App() {
     setUrl('')
     setFile(null)
     setPastedJson('')
+    setEndpointSearch('')
     setFileInputKey((key) => key + 1)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -182,7 +189,7 @@ function App() {
           <p className="eyebrow">WordPress REST → OpenAPI 3.0</p>
           <h1 id="page-title">Turn a WordPress API into clear, usable documentation.</h1>
           <p className="intro-copy">
-            Point to a REST index or bring your own JSON. We’ll convert its routes into an OpenAPI document and render it here—without uploading or saving your data.
+            Point to a REST index or bring your own JSON. We’ll convert its routes into an OpenAPI document and render it here without uploading or saving your data.
           </p>
         </section>
 
@@ -340,22 +347,6 @@ function App() {
               <div><dt>Skipped routes</dt><dd>{result.stats.skippedRoutes}</dd></div>
             </dl>
 
-            {result.warnings.length > 0 && (
-              <details className="warnings-panel">
-                <summary>{result.warnings.length} conversion {result.warnings.length === 1 ? 'warning' : 'warnings'}</summary>
-                <ul>
-                  {result.warnings.map((warning, index) => (
-                    <li key={`${warning.code}-${warning.route ?? 'document'}-${warning.method ?? ''}-${warning.argument ?? ''}-${index}`}>
-                      <span>{warning.message}</span>
-                      {(warning.route || warning.method || warning.argument) && (
-                        <code>{[warning.method, warning.route, warning.argument].filter(Boolean).join(' · ')}</code>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-
             <div className="documentation-heading">
               <div>
                 <p className="step-label">03 · Explore the API</p>
@@ -363,9 +354,36 @@ function App() {
               </div>
               <span className="swagger-label">Powered by Swagger UI</span>
             </div>
-            <div className="swagger-frame">
-              <SwaggerViewer spec={result.spec} />
+            <div className="endpoint-search">
+              <label htmlFor="endpoint-search">Search endpoints</label>
+              <div className="endpoint-search-field">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <circle cx="8.5" cy="8.5" r="5.5" />
+                  <path d="m12.5 12.5 4 4" />
+                </svg>
+                <input
+                  id="endpoint-search"
+                  type="search"
+                  value={endpointSearch}
+                  onChange={(event) => setEndpointSearch(event.target.value)}
+                  placeholder="Search by path, method, operation, or namespace"
+                />
+                <span aria-live="polite">
+                  {endpointSearchResult?.operations ?? 0} {endpointSearchResult?.operations === 1 ? 'operation' : 'operations'}
+                </span>
+              </div>
             </div>
+            {endpointSearchResult && endpointSearchResult.operations > 0 ? (
+              <div className="swagger-frame">
+                <SwaggerViewer spec={endpointSearchResult.spec} />
+              </div>
+            ) : (
+              <div className="empty-search" role="status">
+                <strong>No endpoints found</strong>
+                <span>Try a path segment, HTTP method, operation ID, or namespace.</span>
+                <button type="button" onClick={() => setEndpointSearch('')}>Clear search</button>
+              </div>
+            )}
           </section>
         )}
       </main>
