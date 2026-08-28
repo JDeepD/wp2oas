@@ -10,8 +10,9 @@ WP OpenAPI is a client-side React application that converts a WordPress REST API
 - Maps WordPress namespaces, routes, methods, arguments, constraints, and named regex path parameters to OpenAPI.
 - Reports conversion warnings and route, path, operation, and skipped-route counts.
 - Downloads the generated document as JSON or YAML.
+- Creates reloadable share links for conversions made from public WordPress URLs.
 
-The input and generated document stay in browser memory. The application has no backend, proxy, persistence layer, authentication flow, or analytics dependency.
+Uploaded files, pasted JSON, and generated documents stay in browser memory. For URL conversions, the normalized public WordPress endpoint is added to the page URL so the result can be reopened or shared. The application has no backend, proxy, persistence layer, authentication flow, or analytics dependency.
 
 ## Development
 
@@ -32,6 +33,7 @@ The individual commands are `npm run lint`, `npm test`, and `npm run build`.
 
 - `src/lib/converter.ts` contains the pure `convertWordPressIndex` implementation.
 - `src/lib/input.ts` handles URL normalization, browser fetches, file reads, JSON parsing, and input errors.
+- `src/lib/share.ts` creates and reads reloadable URL conversion links.
 - `src/components/SwaggerViewer.tsx` mounts Swagger UI with the generated document through its `spec` option.
 - `tests/` covers route conversion, method merging, schema mapping, server derivation, validation, cancellation, and network error classification.
 

@@ -421,6 +421,83 @@ textarea {
   font-size: 25px;
 }
 
+.share-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(360px, 1.2fr);
+  align-items: center;
+  gap: 18px 32px;
+  margin-top: 18px;
+  padding: 24px 26px;
+  background: var(--blue-soft);
+  border: 1px solid #cfd8f8;
+  border-radius: 10px;
+}
+
+.share-panel .step-label {
+  margin-bottom: 7px;
+}
+
+.share-panel h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.share-panel > div:first-child > p:last-child {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.share-link-field {
+  display: flex;
+  min-width: 0;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #bcc9f1;
+  border-radius: 8px;
+}
+
+.share-link-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(49, 87, 213, 0.11);
+}
+
+.share-link-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0 10px;
+  color: #4d5870;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.share-link-field button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 15px;
+  color: #fff;
+  background: var(--blue);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.share-copy-error {
+  grid-column: 2;
+  margin: -8px 0 0;
+  color: var(--red);
+  font-size: 10px;
+}
+
 .documentation-heading { align-items: flex-end; margin-top: 72px; padding-bottom: 18px; }
 .swagger-label { padding: 7px 10px; background: #fff; }
 
@@ -583,6 +660,8 @@ textarea {
   .stats-grid div:nth-child(2) { border-right: 0; }
   .stats-grid div:nth-child(-n + 2) { border-bottom: 1px solid var(--border); }
   .stats-grid div { padding: 20px; }
+  .share-panel { grid-template-columns: 1fr; padding: 20px; }
+  .share-copy-error { grid-column: 1; }
   .documentation-heading { align-items: flex-start; flex-direction: column; margin-top: 50px; }
   .endpoint-search-field span { display: none; }
   .swagger-viewer .swagger-ui .wrapper { padding: 13px 9px; }

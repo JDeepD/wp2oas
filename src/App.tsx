@@ -14,6 +14,11 @@ import {
 } from './lib/input.ts'
 import type { OpenAPIDocument } from './lib/openapi.ts'
 import { filterOpenApiDocument } from './lib/search.ts'
+import {
+  createShareableUrl,
+  readSharedSourceUrl,
+  removeSharedSourceUrl,
+} from './lib/share.ts'
 import type { WordPressRestIndex } from './lib/wordpress.ts'
 import './App.css'
 
@@ -93,23 +98,85 @@ function downloadDocument(spec: OpenAPIDocument, format: 'json' | 'yaml'): void 
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
 
+async function copyText(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.append(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  textarea.remove()
+  if (!copied) throw new Error('Clipboard access is unavailable.')
+}
+
 function App() {
+  const [initialSharedUrl] = useState(() => readSharedSourceUrl(window.location.href))
   const [mode, setMode] = useState<InputMode>('url')
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(initialSharedUrl ?? '')
   const [file, setFile] = useState<File | null>(null)
   const [pastedJson, setPastedJson] = useState('')
   const [result, setResult] = useState<ConversionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(Boolean(initialSharedUrl))
   const [endpointSearch, setEndpointSearch] = useState('')
+  const [shareSourceUrl, setShareSourceUrl] = useState<string | null>(
+    initialSharedUrl ?? null,
+  )
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [fileInputKey, setFileInputKey] = useState(0)
   const requestController = useRef<AbortController | null>(null)
   const resultHeadingRef = useRef<HTMLHeadingElement>(null)
+  const sharedLoadStarted = useRef(false)
   const debouncedEndpointSearch = useDebouncedValue(endpointSearch, 200)
   const endpointSearchResult = useMemo(
     () => result ? filterOpenApiDocument(result.spec, debouncedEndpointSearch) : null,
     [debouncedEndpointSearch, result],
   )
+  const shareUrl = useMemo(
+    () => shareSourceUrl
+      ? createShareableUrl(window.location.href, shareSourceUrl)
+      : null,
+    [shareSourceUrl],
+  )
+
+  useEffect(() => {
+    if (!initialSharedUrl || sharedLoadStarted.current) return
+    sharedLoadStarted.current = true
+
+    const loadSharedIndex = async () => {
+      try {
+        const sourceUrl = normalizeWordPressUrl(initialSharedUrl)
+        setUrl(sourceUrl)
+        const controller = new AbortController()
+        requestController.current = controller
+        const index = await fetchWordPressIndex(sourceUrl, {
+          signal: controller.signal,
+        })
+        const nextResult = convertWordPressIndex(index, sourceUrl)
+        setResult(nextResult)
+        setShareSourceUrl(sourceUrl)
+        window.history.replaceState(
+          null,
+          '',
+          createShareableUrl(window.location.href, sourceUrl),
+        )
+        window.setTimeout(() => resultHeadingRef.current?.focus(), 0)
+      } catch (cause) {
+        setError(getErrorMessage(cause))
+      } finally {
+        requestController.current = null
+        setIsLoading(false)
+      }
+    }
+
+    void loadSharedIndex()
+  }, [initialSharedUrl])
 
   const selectMode = (nextMode: InputMode) => {
     setMode(nextMode)
@@ -160,6 +227,15 @@ function App() {
       const { index, sourceUrl } = await loadIndex()
       const nextResult = convertWordPressIndex(index, sourceUrl)
       setResult(nextResult)
+      setShareSourceUrl(sourceUrl ?? null)
+      setCopyStatus('idle')
+      window.history.replaceState(
+        null,
+        '',
+        sourceUrl
+          ? createShareableUrl(window.location.href, sourceUrl)
+          : removeSharedSourceUrl(window.location.href),
+      )
       window.setTimeout(() => resultHeadingRef.current?.focus(), 0)
     } catch (cause) {
       setError(getErrorMessage(cause))
@@ -171,6 +247,16 @@ function App() {
 
   const cancelRequest = () => requestController.current?.abort()
 
+  const copyShareLink = async () => {
+    if (!shareUrl) return
+    try {
+      await copyText(shareUrl)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+  }
+
   const startOver = () => {
     requestController.current?.abort()
     setResult(null)
@@ -179,7 +265,14 @@ function App() {
     setFile(null)
     setPastedJson('')
     setEndpointSearch('')
+    setShareSourceUrl(null)
+    setCopyStatus('idle')
     setFileInputKey((key) => key + 1)
+    window.history.replaceState(
+      null,
+      '',
+      removeSharedSourceUrl(window.location.href),
+    )
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -328,7 +421,7 @@ function App() {
             <footer className="card-footer">
               <span>No proxy</span>
               <span>No credentials</span>
-              <span>No persistence</span>
+              <span>Local processing</span>
             </footer>
           </section>
         ) : (
@@ -358,6 +451,34 @@ function App() {
               <div><dt>Operations</dt><dd>{result.stats.operations}</dd></div>
               <div><dt>Skipped routes</dt><dd>{result.stats.skippedRoutes}</dd></div>
             </dl>
+
+            {shareUrl && (
+              <section className="share-panel" aria-labelledby="share-title">
+                <div>
+                  <p className="step-label">Share this reference</p>
+                  <h3 id="share-title">Open this API again with one link</h3>
+                  <p>Anyone with the link will fetch the same public WordPress REST index and go directly to this result.</p>
+                </div>
+                <div className="share-link-field">
+                  <label className="visually-hidden" htmlFor="share-link">Shareable link</label>
+                  <input
+                    id="share-link"
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <button type="button" onClick={copyShareLink}>
+                    {copyStatus === 'copied' ? 'Link copied' : copyStatus === 'failed' ? 'Try again' : 'Copy link'}
+                  </button>
+                </div>
+                {copyStatus === 'failed' && (
+                  <p className="share-copy-error" role="alert">
+                    Clipboard access was blocked. Select and copy the link manually.
+                  </p>
+                )}
+              </section>
+            )}
 
             <div className="documentation-heading">
               <div>
