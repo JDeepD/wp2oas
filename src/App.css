@@ -34,8 +34,11 @@
   color: #fff;
   background: var(--blue);
   border-radius: 50%;
-  font-family: Georgia, serif;
-  font-size: 19px;
+  font-family: Inter, 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  text-transform: lowercase;
 }
 
 .privacy-note {

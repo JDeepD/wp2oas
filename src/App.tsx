@@ -280,7 +280,7 @@ function App() {
     <div className="app-shell">
       <header className="site-header">
         <button className="brand" type="button" onClick={startOver} aria-label="Start over">
-          <span className="brand-mark" aria-hidden="true">2</span>
+          <span className="brand-mark" aria-hidden="true">wp</span>
           <span>wp2oas</span>
         </button>
         <div className="privacy-note">
