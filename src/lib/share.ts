@@ -1,8 +1,22 @@
 const SOURCE_URL_PARAMETER = 'url'
 
 export function readSharedSourceUrl(applicationUrl: string): string | undefined {
-  const value = new URL(applicationUrl).searchParams.get(SOURCE_URL_PARAMETER)?.trim()
-  return value || undefined
+  const url = new URL(applicationUrl)
+  const rawValue = url.search
+    .slice(1)
+    .split('&')
+    .find((parameter) => parameter.startsWith(`${SOURCE_URL_PARAMETER}=`))
+    ?.slice(SOURCE_URL_PARAMETER.length + 1)
+    .trim()
+
+  if (!rawValue) return undefined
+  if (/^https?:\/\//i.test(rawValue)) return rawValue
+
+  try {
+    return decodeURIComponent(rawValue.replaceAll('+', ' ')) || undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function createShareableUrl(
@@ -10,9 +24,12 @@ export function createShareableUrl(
   sourceUrl: string,
 ): string {
   const url = new URL(applicationUrl)
-  url.searchParams.set(SOURCE_URL_PARAMETER, sourceUrl)
+  url.searchParams.delete(SOURCE_URL_PARAMETER)
+  const remainingParameters = url.searchParams.toString()
+  url.search = ''
   url.hash = ''
-  return url.toString()
+  const suffix = remainingParameters ? `&${remainingParameters}` : ''
+  return `${url.toString()}?${SOURCE_URL_PARAMETER}=${sourceUrl}${suffix}`
 }
 
 export function removeSharedSourceUrl(applicationUrl: string): string {
