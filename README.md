@@ -1,6 +1,6 @@
-# WP OpenAPI
+# wp2oas
 
-WP OpenAPI is a client-side React application that converts a WordPress REST API index into an OpenAPI 3.0.3 document and renders it with Swagger UI.
+wp2oas is a client-side React application that converts a WordPress REST API index into an OpenAPI 3.0.3 document and renders it with Swagger UI.
 
 ## What it does
 

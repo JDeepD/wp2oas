@@ -1,5 +1,5 @@
 {
-  "name": "wordpress-openapi",
+  "name": "wp2oas",
   "private": true,
   "version": "1.0.0",
   "type": "module",

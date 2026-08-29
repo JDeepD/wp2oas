@@ -8,13 +8,13 @@ import {
 
 test('creates and reads a shareable WordPress source URL', () => {
   const sharedUrl = createShareableUrl(
-    'https://tools.example/wp-openapi/?theme=light#results',
+    'https://tools.example/wp2oas/?theme=light#results',
     'https://wordpress.example/blog/wp-json',
   )
 
   assert.equal(
     sharedUrl,
-    'https://tools.example/wp-openapi/?url=https://wordpress.example/blog/wp-json&theme=light',
+    'https://tools.example/wp2oas/?url=https://wordpress.example/blog/wp-json&theme=light',
   )
   assert.equal(
     readSharedSourceUrl(sharedUrl),
