@@ -8,11 +8,12 @@ wp2oas is a client-side React application that converts a WordPress REST API ind
 - Imports a downloaded JSON file of up to 10 MB.
 - Converts pasted REST index JSON.
 - Maps WordPress namespaces, routes, methods, arguments, constraints, and named regex path parameters to OpenAPI.
-- Reports conversion warnings and route, path, operation, and skipped-route counts.
+- Reports route, path, operation, and skipped-route counts.
 - Downloads the generated document as JSON or YAML.
 - Creates reloadable share links for conversions made from public WordPress URLs.
+- Creates section permalinks that reopen a result filtered to one API namespace.
 
-Uploaded files, pasted JSON, and generated documents stay in browser memory. For URL conversions, the normalized public WordPress endpoint is added to the page URL so the result can be reopened or shared. The application has no backend, proxy, persistence layer, authentication flow, or analytics dependency.
+Uploaded files, pasted JSON, and generated documents stay in browser memory. For URL conversions, the normalized public WordPress endpoint is added to the page URL so the result can be reopened or shared. A section permalink adds the namespace as the URL fragment and restores that filtered section when opened. The application has no backend, proxy, persistence layer, authentication flow, or analytics dependency.
 
 ## Development
 

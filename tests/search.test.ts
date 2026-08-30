@@ -53,3 +53,12 @@ test('searches operation IDs and namespace tags', () => {
   assert.equal(noMatches.operations, 0)
   assert.deepEqual(noMatches.spec.paths, {})
 })
+
+test('treats hash-prefixed searches as exact namespace sections', () => {
+  const result = filterOpenApiDocument(spec, '#wp/v2')
+  assert.equal(result.operations, 2)
+  assert.deepEqual(Object.keys(result.spec.paths), ['/wp/v2/posts'])
+
+  const partialSection = filterOpenApiDocument(spec, '#wp')
+  assert.equal(partialSection.operations, 0)
+})

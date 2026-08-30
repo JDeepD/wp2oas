@@ -56,11 +56,17 @@ export function filterOpenApiDocument(
         .join(' ')
         .toLowerCase()
 
-      const matches = terms.every((term) =>
-        HTTP_METHODS.includes(term as OpenAPIHttpMethod)
+      const matches = terms.every((term) => {
+        if (term.startsWith('#')) {
+          const section = term.slice(1)
+          return Boolean(section) && operation.tags?.some(
+            (tag) => tag.toLowerCase() === section,
+          )
+        }
+        return HTTP_METHODS.includes(term as OpenAPIHttpMethod)
           ? method === term
-          : searchText.includes(term),
-      )
+          : searchText.includes(term)
+      })
       if (!matches) continue
       matchingOperations[method] = operation
       operation.tags?.forEach((tag) => usedTags.add(tag))

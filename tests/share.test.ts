@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createShareableUrl,
+  readSharedSection,
   readSharedSourceUrl,
   removeSharedSourceUrl,
 } from '../src/lib/share.ts'
@@ -38,6 +39,24 @@ test('keeps query-based WordPress routes readable', () => {
   )
 })
 
+test('adds and reads a section fragment without obscuring the source URL', () => {
+  const sharedUrl = createShareableUrl(
+    'https://tools.example/',
+    'https://wordpress.example/wp-json',
+    'ee-wires/v1',
+  )
+
+  assert.equal(
+    sharedUrl,
+    'https://tools.example/?url=https://wordpress.example/wp-json#ee-wires/v1',
+  )
+  assert.equal(readSharedSection(sharedUrl), 'ee-wires/v1')
+  assert.equal(
+    readSharedSourceUrl(sharedUrl),
+    'https://wordpress.example/wp-json',
+  )
+})
+
 test('continues to read previously encoded share links', () => {
   assert.equal(
     readSharedSourceUrl(
@@ -55,4 +74,5 @@ test('removes only the shared source parameter', () => {
     'https://tools.example/?theme=light',
   )
   assert.equal(readSharedSourceUrl('https://tools.example/'), undefined)
+  assert.equal(readSharedSection('https://tools.example/'), undefined)
 })

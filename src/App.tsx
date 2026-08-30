@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dump as toYaml } from 'js-yaml'
 import { SwaggerViewer } from './components/SwaggerViewer.tsx'
 import {
@@ -16,6 +16,7 @@ import type { OpenAPIDocument } from './lib/openapi.ts'
 import { filterOpenApiDocument } from './lib/search.ts'
 import {
   createShareableUrl,
+  readSharedSection,
   readSharedSourceUrl,
   removeSharedSourceUrl,
 } from './lib/share.ts'
@@ -117,6 +118,9 @@ async function copyText(value: string): Promise<void> {
 
 function App() {
   const [initialSharedUrl] = useState(() => readSharedSourceUrl(window.location.href))
+  const [initialSharedSection] = useState(() =>
+    initialSharedUrl ? readSharedSection(window.location.href) : undefined,
+  )
   const [mode, setMode] = useState<InputMode>('url')
   const [url, setUrl] = useState(initialSharedUrl ?? '')
   const [file, setFile] = useState<File | null>(null)
@@ -124,7 +128,12 @@ function App() {
   const [result, setResult] = useState<ConversionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(Boolean(initialSharedUrl))
-  const [endpointSearch, setEndpointSearch] = useState('')
+  const [endpointSearch, setEndpointSearch] = useState(
+    initialSharedSection ? `#${initialSharedSection}` : '',
+  )
+  const [selectedSection, setSelectedSection] = useState<string | null>(
+    initialSharedSection ?? null,
+  )
   const [shareSourceUrl, setShareSourceUrl] = useState<string | null>(
     initialSharedUrl ?? null,
   )
@@ -140,9 +149,13 @@ function App() {
   )
   const shareUrl = useMemo(
     () => shareSourceUrl
-      ? createShareableUrl(window.location.href, shareSourceUrl)
+      ? createShareableUrl(
+          window.location.href,
+          shareSourceUrl,
+          selectedSection ?? undefined,
+        )
       : null,
-    [shareSourceUrl],
+    [selectedSection, shareSourceUrl],
   )
 
   useEffect(() => {
@@ -164,7 +177,11 @@ function App() {
         window.history.replaceState(
           null,
           '',
-          createShareableUrl(window.location.href, sourceUrl),
+          createShareableUrl(
+            window.location.href,
+            sourceUrl,
+            initialSharedSection,
+          ),
         )
         window.setTimeout(() => resultHeadingRef.current?.focus(), 0)
       } catch (cause) {
@@ -176,7 +193,7 @@ function App() {
     }
 
     void loadSharedIndex()
-  }, [initialSharedUrl])
+  }, [initialSharedSection, initialSharedUrl])
 
   const selectMode = (nextMode: InputMode) => {
     setMode(nextMode)
@@ -233,7 +250,11 @@ function App() {
         null,
         '',
         sourceUrl
-          ? createShareableUrl(window.location.href, sourceUrl)
+          ? createShareableUrl(
+              window.location.href,
+              sourceUrl,
+              selectedSection ?? undefined,
+            )
           : removeSharedSourceUrl(window.location.href),
       )
       window.setTimeout(() => resultHeadingRef.current?.focus(), 0)
@@ -246,6 +267,45 @@ function App() {
   }
 
   const cancelRequest = () => requestController.current?.abort()
+
+  const selectApiSection = useCallback((section: string) => {
+    setEndpointSearch(`#${section}`)
+    setSelectedSection(section)
+    setCopyStatus('idle')
+    if (shareSourceUrl) {
+      window.history.replaceState(
+        null,
+        '',
+        createShareableUrl(window.location.href, shareSourceUrl, section),
+      )
+    }
+  }, [shareSourceUrl])
+
+  const changeEndpointSearch = (value: string) => {
+    setEndpointSearch(value)
+    if (!selectedSection) return
+    setSelectedSection(null)
+    setCopyStatus('idle')
+    if (shareSourceUrl) {
+      window.history.replaceState(
+        null,
+        '',
+        createShareableUrl(window.location.href, shareSourceUrl),
+      )
+    }
+  }
+
+  const clearEndpointSearch = () => changeEndpointSearch('')
+
+  const handleSwaggerReady = useCallback(() => {
+    if (!initialSharedSection) return
+    window.setTimeout(() => {
+      const sectionLink = [...document.querySelectorAll<HTMLButtonElement>(
+        '.wp2oas-section-link',
+      )].find(({ dataset }) => dataset.section === initialSharedSection)
+      sectionLink?.closest('.opblock-tag')?.scrollIntoView({ block: 'start' })
+    }, 0)
+  }, [initialSharedSection])
 
   const copyShareLink = async () => {
     if (!shareUrl) return
@@ -265,6 +325,7 @@ function App() {
     setFile(null)
     setPastedJson('')
     setEndpointSearch('')
+    setSelectedSection(null)
     setShareSourceUrl(null)
     setCopyStatus('idle')
     setFileInputKey((key) => key + 1)
@@ -498,7 +559,7 @@ function App() {
                   id="endpoint-search"
                   type="search"
                   value={endpointSearch}
-                  onChange={(event) => setEndpointSearch(event.target.value)}
+                  onChange={(event) => changeEndpointSearch(event.target.value)}
                   placeholder="Search by path, method, operation, or namespace"
                 />
                 <span aria-live="polite">
@@ -512,13 +573,17 @@ function App() {
                   className="swagger-frame"
                   hidden={endpointSearchResult.operations === 0}
                 >
-                  <SwaggerViewer spec={endpointSearchResult.spec} />
+                  <SwaggerViewer
+                    spec={endpointSearchResult.spec}
+                    onSectionSelect={selectApiSection}
+                    onReady={handleSwaggerReady}
+                  />
                 </div>
                 {endpointSearchResult.operations === 0 && (
                   <div className="empty-search" role="status">
                     <strong>No endpoints found</strong>
                     <span>Try a path segment, HTTP method, operation ID, or namespace.</span>
-                    <button type="button" onClick={() => setEndpointSearch('')}>Clear search</button>
+                    <button type="button" onClick={clearEndpointSearch}>Clear search</button>
                   </div>
                 )}
               </>

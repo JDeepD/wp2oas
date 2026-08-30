@@ -19,9 +19,21 @@ export function readSharedSourceUrl(applicationUrl: string): string | undefined 
   }
 }
 
+export function readSharedSection(applicationUrl: string): string | undefined {
+  const fragment = new URL(applicationUrl).hash.slice(1).trim()
+  if (!fragment) return undefined
+
+  try {
+    return decodeURIComponent(fragment) || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function createShareableUrl(
   applicationUrl: string,
   sourceUrl: string,
+  section?: string,
 ): string {
   const url = new URL(applicationUrl)
   url.searchParams.delete(SOURCE_URL_PARAMETER)
@@ -29,7 +41,8 @@ export function createShareableUrl(
   url.search = ''
   url.hash = ''
   const suffix = remainingParameters ? `&${remainingParameters}` : ''
-  return `${url.toString()}?${SOURCE_URL_PARAMETER}=${sourceUrl}${suffix}`
+  const fragment = section ? `#${encodeURI(section)}` : ''
+  return `${url.toString()}?${SOURCE_URL_PARAMETER}=${sourceUrl}${suffix}${fragment}`
 }
 
 export function removeSharedSourceUrl(applicationUrl: string): string {

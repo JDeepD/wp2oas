@@ -621,7 +621,39 @@ textarea {
 .swagger-viewer .swagger-ui .information-container,
 .swagger-viewer .swagger-ui .scheme-container { display: none; }
 .swagger-viewer .swagger-ui .wrapper { max-width: none; padding: 22px 24px; }
-.swagger-viewer .swagger-ui .opblock-tag { font-family: Inter, 'Avenir Next', 'Segoe UI', system-ui, sans-serif; font-size: 20px; }
+.swagger-viewer .swagger-ui .opblock-tag {
+  scroll-margin-top: 20px;
+  font-family: Inter, 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+  font-size: 20px;
+}
+
+.swagger-viewer .swagger-ui .opblock-tag .wp2oas-section-link {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0 9px 0 0;
+  padding: 2px 5px;
+  color: #7a8394;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.swagger-viewer .swagger-ui .opblock-tag .wp2oas-section-link:hover {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.swagger-viewer .swagger-ui .opblock-tag .wp2oas-section-link:focus-visible {
+  color: var(--blue);
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
 .swagger-viewer .swagger-ui .opblock .opblock-summary-method,
 .swagger-viewer .swagger-ui .opblock .opblock-summary-path,
 .swagger-viewer .swagger-ui .parameter__name,
