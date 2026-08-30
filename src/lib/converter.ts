@@ -491,16 +491,22 @@ function buildOperation(
   seed: OperationSeed,
   warnings: ConversionWarning[],
 ): OpenAPIOperation {
-  const operationParameters: OpenAPIParameter[] = parameters.map((parameter) => ({
-    name: parameter.name,
-    in: 'path',
-    required: true,
-    schema: pathParameterSchema(parameter, seed.args[parameter.name], warnings, {
-      route: path,
-      method: method.toUpperCase(),
-      argument: parameter.name,
-    }),
-  }))
+  const operationParameters: OpenAPIParameter[] = parameters.map((parameter) => {
+    const definition = seed.args[parameter.name]
+    const description = asNonEmptyString(definition?.description)
+
+    return {
+      name: parameter.name,
+      in: 'path',
+      required: true,
+      ...(description ? { description } : {}),
+      schema: pathParameterSchema(parameter, definition, warnings, {
+        route: path,
+        method: method.toUpperCase(),
+        argument: parameter.name,
+      }),
+    }
+  })
   const pathNames = new Set(parameters.map(({ name }) => name))
   const bodyProperties: Record<string, OpenAPISchema> = {}
   const bodyRequired: string[] = []
@@ -532,7 +538,7 @@ function buildOperation(
 
   const operation: OpenAPIOperation = {
     operationId: operationId(method, path),
-    ...(seed.namespace ? { summary: seed.namespace, tags: [seed.namespace] } : {}),
+    ...(seed.namespace ? { tags: [seed.namespace] } : {}),
     ...(operationParameters.length ? { parameters: operationParameters } : {}),
     responses: { '200': { description: 'Successful response' } },
   }

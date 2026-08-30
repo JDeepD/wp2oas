@@ -75,7 +75,11 @@ test('places arguments according to HTTP method semantics', () => {
       '/demo/v1/things/(?P<id>\\d+)': {
         namespace: 'demo/v1',
         args: {
-          id: { type: 'integer', required: false },
+          id: {
+            type: 'integer',
+            description: 'Unique thing identifier.',
+            required: false,
+          },
           force: { type: 'boolean', required: true },
         },
         methods: ['GET', 'POST', 'DELETE', 'OPTIONS', 'HEAD'],
@@ -87,10 +91,73 @@ test('places arguments according to HTTP method semantics', () => {
   for (const method of ['get', 'delete', 'options', 'head'] as const) {
     assert.equal(path[method]?.requestBody, undefined)
     assert.equal(path[method]?.parameters?.[0].required, true)
+    assert.equal(
+      path[method]?.parameters?.[0].description,
+      'Unique thing identifier.',
+    )
     assert.equal(path[method]?.parameters?.[1].name, 'force')
+    assert.equal(path[method]?.summary, undefined)
+    assert.deepEqual(path[method]?.tags, ['demo/v1'])
   }
   assert.equal(path.post?.parameters?.length, 1)
   assert.equal(path.post?.requestBody?.required, true)
+})
+
+test('preserves descriptions throughout nested request body schemas', () => {
+  const result = convertWordPressIndex(
+    indexWith({
+      '/ee-wires/v1/draft/v1/(?P<type>[a-z][a-z0-9_-]*)': {
+        namespace: 'ee-wires/v1',
+        endpoints: [{
+          methods: ['POST'],
+          args: {
+            type: {
+              type: 'string',
+              description: 'Arc draft content type segment.',
+              required: true,
+            },
+            taxonomy: {
+              type: 'object',
+              description: 'Wire tags and SEO keywords.',
+              properties: {
+                tags: {
+                  type: 'array',
+                  description: 'Tags added to the draft.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      text: {
+                        type: 'string',
+                        description: 'The visible tag text.',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }],
+      },
+    }),
+  )
+  const operation = result.spec.paths[
+    '/ee-wires/v1/draft/v1/{type}'
+  ].post
+  const schema = operation?.requestBody?.content['application/json'].schema
+
+  assert.equal(
+    operation?.parameters?.[0].description,
+    'Arc draft content type segment.',
+  )
+  assert.equal(schema?.properties?.taxonomy.description, 'Wire tags and SEO keywords.')
+  assert.equal(
+    schema?.properties?.taxonomy.properties?.tags.description,
+    'Tags added to the draft.',
+  )
+  assert.equal(
+    schema?.properties?.taxonomy.properties?.tags.items?.properties?.text.description,
+    'The visible tag text.',
+  )
 })
 
 test('maps supported schema constraints and warns instead of emitting invalid values', () => {

@@ -77,6 +77,7 @@ export function SwaggerViewer({
           deepLinking: true,
           displayRequestDuration: true,
           docExpansion: 'list',
+          defaultModelRendering: 'model',
           defaultModelsExpandDepth: -1,
           tryItOutEnabled: false,
         })

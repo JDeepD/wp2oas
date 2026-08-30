@@ -11,6 +11,7 @@ declare module 'swagger-ui-dist/swagger-ui-es-bundle.js' {
     deepLinking?: boolean
     displayRequestDuration?: boolean
     docExpansion?: 'none' | 'list' | 'full'
+    defaultModelRendering?: 'example' | 'model'
     defaultModelsExpandDepth?: number
     tryItOutEnabled?: boolean
   }
