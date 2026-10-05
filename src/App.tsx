@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { dump as toYaml } from 'js-yaml'
-import { SwaggerViewer } from './components/SwaggerViewer.tsx'
+import { ConverterGuide } from './components/ConverterGuide.tsx'
 import {
   convertWordPressIndex,
   type ConversionResult,
@@ -24,6 +24,10 @@ import type { WordPressRestIndex } from './lib/wordpress.ts'
 import './App.css'
 
 type InputMode = 'url' | 'file' | 'paste'
+
+const SwaggerViewer = lazy(() =>
+  import('./components/SwaggerViewer.tsx').then(({ SwaggerViewer }) => ({ default: SwaggerViewer })),
+)
 
 const INPUT_MODES: Array<{ id: InputMode; label: string }> = [
   { id: 'url', label: 'WordPress URL' },
@@ -117,7 +121,9 @@ async function copyText(value: string): Promise<void> {
 }
 
 function App() {
-  const [initialSharedUrl] = useState(() => readSharedSourceUrl(window.location.href))
+  const [initialSharedUrl] = useState(() =>
+    typeof window === 'undefined' ? undefined : readSharedSourceUrl(window.location.href),
+  )
   const [initialSharedSection] = useState(() =>
     initialSharedUrl ? readSharedSection(window.location.href) : undefined,
   )
@@ -354,9 +360,9 @@ function App() {
       <main>
         <section className="intro" aria-labelledby="page-title">
           <p className="eyebrow">WordPress REST → OpenAPI 3.0</p>
-          <h1 id="page-title">Turn a WordPress API into clear, usable documentation.</h1>
+          <h1 id="page-title">Convert your WordPress REST API to OpenAPI.</h1>
           <p className="intro-copy">
-            Point to a REST index or bring your own JSON. We’ll convert its routes into an OpenAPI document and render it here without uploading or saving your data.
+            Generate an OpenAPI 3.0.3 specification from a WordPress REST index, explore its endpoints with Swagger UI, and download JSON or YAML. Free to use, with all conversion done in your browser.
           </p>
         </section>
 
@@ -574,11 +580,18 @@ function App() {
                   className="swagger-frame"
                   hidden={endpointSearchResult.operations === 0}
                 >
-                  <SwaggerViewer
-                    spec={endpointSearchResult.spec}
-                    onSectionSelect={selectApiSection}
-                    onReady={handleSwaggerReady}
-                  />
+                  <Suspense fallback={
+                    <div className="swagger-initial-state" role="status">
+                      <span className="spinner" aria-hidden="true" />
+                      <span>Loading API reference...</span>
+                    </div>
+                  }>
+                    <SwaggerViewer
+                      spec={endpointSearchResult.spec}
+                      onSectionSelect={selectApiSection}
+                      onReady={handleSwaggerReady}
+                    />
+                  </Suspense>
                 </div>
                 {endpointSearchResult.operations === 0 && (
                   <div className="empty-search" role="status">
@@ -591,6 +604,7 @@ function App() {
             )}
           </section>
         )}
+        {!result && <ConverterGuide />}
       </main>
 
       <footer className="site-footer">
