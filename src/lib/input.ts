@@ -195,10 +195,32 @@ function networkFailure(cause: unknown): WordPressInputError {
   )
 }
 
+function wwwFallbackUrl(target: URL): string | undefined {
+  const hostname = target.hostname
+  if (
+    hostname.startsWith('www.') ||
+    !hostname.includes('.') ||
+    hostname.endsWith('.localhost') ||
+    hostname.includes(':') ||
+    /^[\d.]+$/.test(hostname)
+  ) {
+    return undefined
+  }
+
+  const fallback = new URL(target)
+  fallback.hostname = `www.${hostname}`
+  return fallback.toString()
+}
+
+export interface FetchedWordPressIndex {
+  index: WordPressRestIndex
+  sourceUrl: string
+}
+
 export async function fetchWordPressIndex(
   normalizedUrl: string,
   options: FetchIndexOptions = {},
-): Promise<WordPressRestIndex> {
+): Promise<FetchedWordPressIndex> {
   const pageProtocol = options.pageProtocol ?? currentPageProtocol()
   const target = new URL(normalizedUrl)
   if (pageProtocol === 'https:' && target.protocol === 'http:') {
@@ -222,10 +244,9 @@ export async function fetchWordPressIndex(
   const abortFromCaller = () => controller.abort()
   options.signal?.addEventListener('abort', abortFromCaller, { once: true })
 
-  try {
-    let response: Response
+  const fetchResponse = async (requestUrl: string): Promise<Response> => {
     try {
-      response = await (options.fetchImpl ?? fetch)(normalizedUrl, {
+      return await (options.fetchImpl ?? fetch)(requestUrl, {
         method: 'GET',
         headers: { Accept: 'application/json' },
         credentials: 'omit',
@@ -243,6 +264,28 @@ export async function fetchWordPressIndex(
         throw new WordPressInputError('aborted', 'The request was cancelled.', { cause })
       }
       throw networkFailure(cause)
+    }
+  }
+
+  try {
+    let requestUrl = normalizedUrl
+    let response: Response
+    try {
+      response = await fetchResponse(requestUrl)
+    } catch (cause) {
+      const fallbackUrl = wwwFallbackUrl(target)
+      if (
+        !(cause instanceof WordPressInputError) ||
+        cause.code !== 'network-failure' ||
+        !fallbackUrl
+      ) {
+        throw cause
+      }
+      if (controller.signal.aborted) {
+        throw new WordPressInputError('aborted', 'The request was cancelled.', { cause })
+      }
+      requestUrl = fallbackUrl
+      response = await fetchResponse(requestUrl)
     }
 
     if (!response.ok) {
@@ -268,7 +311,10 @@ export async function fetchWordPressIndex(
     }
 
     try {
-      return parseWordPressIndexJson(body)
+      return {
+        index: parseWordPressIndexJson(body),
+        sourceUrl: response.url || requestUrl,
+      }
     } catch (cause) {
       if (
         cause instanceof WordPressInputError &&

@@ -164,13 +164,14 @@ function App() {
 
     const loadSharedIndex = async () => {
       try {
-        const sourceUrl = normalizeWordPressUrl(initialSharedUrl)
-        setUrl(sourceUrl)
+        const normalizedUrl = normalizeWordPressUrl(initialSharedUrl)
+        setUrl(normalizedUrl)
         const controller = new AbortController()
         requestController.current = controller
-        const index = await fetchWordPressIndex(sourceUrl, {
+        const { index, sourceUrl } = await fetchWordPressIndex(normalizedUrl, {
           signal: controller.signal,
         })
+        setUrl(sourceUrl)
         const nextResult = convertWordPressIndex(index, sourceUrl)
         setResult(nextResult)
         setShareSourceUrl(sourceUrl)
@@ -220,11 +221,10 @@ function App() {
     sourceUrl?: string
   }> => {
     if (mode === 'url') {
-      const sourceUrl = normalizeWordPressUrl(url)
+      const normalizedUrl = normalizeWordPressUrl(url)
       const controller = new AbortController()
       requestController.current = controller
-      const index = await fetchWordPressIndex(sourceUrl, { signal: controller.signal })
-      return { index, sourceUrl }
+      return fetchWordPressIndex(normalizedUrl, { signal: controller.signal })
     }
     if (mode === 'file') {
       if (!file) {
@@ -244,6 +244,7 @@ function App() {
       const { index, sourceUrl } = await loadIndex()
       const nextResult = convertWordPressIndex(index, sourceUrl)
       setResult(nextResult)
+      if (sourceUrl) setUrl(sourceUrl)
       setShareSourceUrl(sourceUrl ?? null)
       setCopyStatus('idle')
       window.history.replaceState(

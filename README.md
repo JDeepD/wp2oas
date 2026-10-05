@@ -40,6 +40,6 @@ The individual commands are `npm run lint`, `npm test`, and `npm run build`.
 
 ## Browser fetch limitations
 
-WordPress URL mode makes a direct browser request to the target site. The site must allow the application origin through CORS, and an HTTPS deployment cannot fetch an HTTP-only WordPress site. When a direct request is blocked, download the WordPress `/wp-json` response and use file upload or paste mode.
+WordPress URL mode makes a direct browser request to the target site. The site must allow the application origin through CORS, and an HTTPS deployment cannot fetch an HTTP-only WordPress site. After a network failure, the application retries once with `www.` prefixed to the hostname, preserving the protocol, port, path, and query. Existing `www` hostnames, IP addresses, and local hostnames are excluded. This can work around a bare-domain redirect that lacks CORS headers when the `www` endpoint allows access. A successful request uses its final URL for the input field, generated document, and share links. Both attempts share the same timeout and cancellation signal; HTTP errors and invalid responses do not trigger a retry. The browser cannot distinguish CORS from other network failures or read a CORS-blocked redirect, so this fallback cannot resolve all CORS restrictions. If both requests fail, download the WordPress `/wp-json` response and use file upload or paste mode.
 
 Credentials, cookies, authorization headers, application passwords, and private WordPress endpoints are intentionally unsupported.
